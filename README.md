@@ -44,7 +44,7 @@ Jobs retry 3 times with backoff. If they fail completely, withdrawals get refund
 ## Setup instructions
 
 ```bash
-git clone <repo>    
+git clone https://github.com/OdugbesanOpeoluwa/wallet-api.git  
 cd wallet-api
 composer install
 cp .env.example .env
