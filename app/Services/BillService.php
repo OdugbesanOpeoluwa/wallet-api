@@ -5,8 +5,8 @@ namespace App\Services;
 
 use App\Models\Transaction;
 use App\Models\Wallet;
-use App\Jobs\ProcessBillPayment;
 use Illuminate\Support\Facades\DB;
+use App\Services\OutboxService;
 
 class BillService
 {
@@ -46,7 +46,7 @@ class BillService
             $this->ledger->recordDebit($wallet, $txn, $amount);            
             $wallet->decrement('balance', $amount);
 
-            ProcessBillPayment::dispatch($txn->id);
+OutboxService::store('bill_payment', $txn->id, ['transaction_id' => $txn->id]);
 
             return $txn;
         });

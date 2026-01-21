@@ -51,11 +51,17 @@ class WebhookController extends Controller
 
     protected function verifySignature(array $payload, ?string $signature): bool
     {
+        if (!$signature) {
+            return false;
+        }
+        $secret = config('services.crypto.webhook_secret');
         
-        // mock verification 
-        $secret = config('services.crypto.webhook_secret', 'test_secret');
-        $expected = hash_hmac('sha256', json_encode($payload), $secret);
-        return $signature === $expected || $signature === 'test_signature';
+        if (!$secret) {
+            return false;
+        }
+        $computed = hash_hmac('sha256', json_encode($payload), $secret);
+        
+        return hash_equals($computed, $signature);
     }
 
     protected function creditWallet(array $payload, WebhookLog $log): void

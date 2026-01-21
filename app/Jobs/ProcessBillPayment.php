@@ -9,6 +9,7 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use App\Services\CircuitBreaker;
 
 class ProcessBillPayment implements ShouldQueue
 {
@@ -17,12 +18,14 @@ class ProcessBillPayment implements ShouldQueue
     public $tries = 3;
     public $backoff = [30, 60, 120];
     public $uniqueFor = 300;
+    
     /**
      * Create a new job instance.
      */
     public function __construct(public string $transactionId)
     {
         //
+        $this->onConnection('rabbitmq');
     }
 
     /**
@@ -35,27 +38,24 @@ class ProcessBillPayment implements ShouldQueue
         if (!$txn || $txn->status !== 'pending') {
             return;
         }
-
-        try{
-                // simulate external API call
-                $success = $this->processBill($txn);
-
-                $txn->update([
-                    'status' => $success ? 'success' : 'failed',
-                ]);
-            }catch(\Exception $e){
-                if($this->attempts() < $this->tries){
-                $txn->update([
-                    'status' => 'failed',
-                ]);
+        $circuit = new CircuitBreaker('bill_provider');
+        try {
+            $success = $circuit->call(fn() => $this->processBill($txn));
+            $txn->update([
+                'status' => $success ? 'success' : 'failed',
+            ]);
+        } catch (\Exception $e) {
+            if ($this->attempts() >= $this->tries) {
+                $txn->update(['status' => 'failed']);
             }
             throw $e;
         }
     }
 
+
     protected function processBill(Transaction $txn): bool
     {
-        //mock high success rate about 90%
+        //mock high success rate of about 90%
         sleep(2);
         return rand(1, 10) <= 9;
     }

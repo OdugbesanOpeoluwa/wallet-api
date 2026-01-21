@@ -8,7 +8,7 @@ use App\Models\Wallet;
 use App\Models\Transaction;
 use App\Models\LedgerEntry;
 use App\Http\Requests\WithdrawalRequest;
-use App\Jobs\ProcessWithdrawal;
+use App\Services\OutboxService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use App\Services\RiskService;
@@ -76,7 +76,7 @@ class WithdrawalController extends Controller
                 ]);
                 $wallet->decrement('balance', $request->amount);
                 $wallet->increment('locked_balance', $request->amount);
-                ProcessWithdrawal::dispatch($txn->id);
+                OutboxService::store('withdrawal', $txn->id, ['transaction_id' => $txn->id]);
                 return $txn;
             });
             AuditService::log('withdrawal', 'transaction', $txn->id, [

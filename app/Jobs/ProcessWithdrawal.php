@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use App\Services\CircuitBreaker;
 
 class ProcessWithdrawal implements ShouldQueue, ShouldBeUnique
 {
@@ -18,6 +19,7 @@ class ProcessWithdrawal implements ShouldQueue, ShouldBeUnique
     public $tries = 3;
     public $backoff = [30, 60, 120];
     public $uniqueFor = 300;
+    public $timeout = 30;
 
 
     /**
@@ -26,6 +28,7 @@ class ProcessWithdrawal implements ShouldQueue, ShouldBeUnique
     public function __construct(public string $transactionId)
     {
         //
+        $this->onConnection('rabbitmq');
     }
 
     /**
@@ -39,11 +42,11 @@ class ProcessWithdrawal implements ShouldQueue, ShouldBeUnique
         if (!$txn || $txn->status !== 'pending') {
             return;
         }
+        $circuit = new CircuitBreaker('bank_provider');
         try {
-            $success = $this->processWithdrawal($txn);
+            $success = $circuit->call(fn() => $this->processWithdrawal($txn));
             if ($success) {
                 $txn->update(['status' => 'success']);
-                // release locked balance
                 $wallet = Wallet::find($txn->sender_wallet_id);
                 $wallet->decrement('locked_balance', $txn->amount);
             } else {
