@@ -20,8 +20,6 @@ This is a simplified wallet system that lets users:
 
 **Why redis**: The reason i used Redis is beacause of the job queue for async processing, plus because of caching for rate limits and distributed locks and also for session management and also some repeated fetch queries.
 
-
-
 ### How transfers work
 
 1. Acquire redis lock on sender wallet (prevents parallel requests)

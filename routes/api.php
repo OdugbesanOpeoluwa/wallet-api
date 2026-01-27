@@ -9,6 +9,7 @@ use App\Http\Controllers\TransferController;
 use App\Http\Controllers\BillController;
 use App\Http\Controllers\WithdrawalController;
 use App\Http\Controllers\WebhookController;
+use App\Http\Middleware\IdempotencyMiddleware;
 
 // rate limiters
 RateLimiter::for('auth', function ($request) {
@@ -27,10 +28,12 @@ RateLimiter::for('financial', function ($request) {
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:auth');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:auth');
 
-// webhook
-Route::post('/webhooks/crypto', [WebhookController::class, 'crypto']);
+// webhooks 
+Route::prefix('webhooks')->group(function () {
+    Route::post('/crypto', [WebhookController::class, 'crypto']);
+    Route::post('/bank', [WebhookController::class, 'bank']);
+});
 
-// protected
 Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/wallets', [WalletController::class, 'index']);
@@ -38,8 +41,8 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::get('/wallets/{id}/transactions', [WalletController::class, 'transactions']);
 });
 
-// financial
-Route::middleware(['auth:sanctum', 'throttle:financial'])->group(function () {
+// financial 
+Route::middleware(['auth:sanctum', 'throttle:financial', IdempotencyMiddleware::class])->group(function () {
     Route::post('/transfers', [TransferController::class, 'store']);
     Route::post('/bills/pay', [BillController::class, 'store']);
     Route::post('/withdrawals', [WithdrawalController::class, 'store']);
